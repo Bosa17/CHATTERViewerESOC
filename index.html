@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTT Subtitle Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .upload-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        .upload-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        .upload-section input {
+            display: block;
+            margin-bottom: 15px;
+            padding: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .viewer {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .video-section {
+            flex: 1;
+        }
+        .video-placeholder {
+            width: 100%;
+            max-width: 640px;
+            height: 360px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .current-subtitle {
+            padding: 20px;
+            font-size: 24px;
+            color: #333;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .controls {
+            margin-top: 15px;
+            max-width: 640px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #2196F3;
+        }
+        button.secondary:hover {
+            background: #0b7dda;
+        }
+        .time-display {
+            color: #666;
+            font-size: 14px;
+        }
+        .subtitle-section {
+            flex: 1;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            height: 580px;
+            overflow-y: auto;
+        }
+        .subtitle-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .subtitle-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: white;
+            border-left: 4px solid transparent;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .subtitle-item:hover {
+            background: #f5f5f5;
+        }
+        .subtitle-item.active {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .subtitle-item.has-low-confidence {
+            background: #fffbea;
+            border-left-color: #ffc107;
+        }
+        .subtitle-item.has-low-confidence.active {
+            background: #fff3cd;
+            border-left-color: #ff9800;
+        }
+        .subtitle-item.editing {
+            background: #e3f2fd;
+            border-left-color: #2196F3;
+        }
+        .subtitle-time {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .subtitle-text {
+            color: #333;
+            line-height: 1.5;
+        }
+        
+        /* VTT Style support */
+        .subtitle-text span,
+        .current-subtitle span {
+            display: inline;
+        }
+        .subtitle-text textarea {
+            width: 100%;
+            min-height: 60px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            display: none;
+        }
+        .edit-view {
+            width: 100%;
+            min-height: 60px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            background: white;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .edit-view[contenteditable="true"] {
+            outline: 2px solid #2196F3;
+        }
+        .edit-view .low_confidence {
+            background-color: yellow;
+            color: red;
+            font-weight: bold;
+        }
+        .edit-buttons {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+        }
+        .edit-buttons button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .hidden {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .viewer {
+                flex-direction: column;
+            }
+            .subtitle-section {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VTT Subtitle Viewer & Editor</h1>
+        
+        <div class="upload-section">
+            <label for="vttFile">Select VTT Subtitle File:</label>
+            <input type="file" id="vttFile" accept=".vtt">
+            
+            <label for="audioFile">Select Audio File (Optional):</label>
+            <input type="file" id="audioFile" accept="audio/*">
+        </div>
+
+        <div class="viewer hidden" id="viewer">
+            <div class="video-section">
+                <div class="video-placeholder">
+                    <div class="current-subtitle" id="currentSubtitle">Subtitles will appear here</div>
+                </div>
+                <div class="controls">
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="control-buttons">
+                        <button id="playPauseBtn">Play</button>
+                        <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
+                        <button class="secondary" id="downloadBtn">Download Edited VTT</button>
+                    </div>
+                </div>
+            </div>
+            <div class="subtitle-section">
+                <h2>Subtitles (Click to seek, Double-click to edit)</h2>
+                <div id="subtitleList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const vttInput = document.getElementById('vttFile');
+        const audioInput = document.getElementById('audioFile');
+        const viewer = document.getElementById('viewer');
+        const subtitleList = document.getElementById('subtitleList');
+        const currentSubtitle = document.getElementById('currentSubtitle');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        let subtitles = [];
+        let currentTime = 0;
+        let duration = 0;
+        let isPlaying = false;
+        let animationFrame = null;
+        let lastTimestamp = null;
+        let audio = null;
+        let hasAudio = false;
+        let editingIndex = null;
+        let vttFileName = 'edited_subtitles.vtt';
+        let vttStyles = '';
+        let styleElement = null;
+
+        vttInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                vttFileName = file.name.replace('.vtt', '_edited.vtt');
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    parseVTT(event.target.result);
+                    viewer.classList.remove('hidden');
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        audioInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (audio) {
+                    audio.pause();
+                    audio = null;
+                }
+                
+                audio = new Audio();
+                const url = URL.createObjectURL(file);
+                audio.src = url;
+                audio.preload = 'auto';
+                hasAudio = true;
+                
+                audio.addEventListener('loadedmetadata', () => {
+                    if (audio.duration > duration) {
+                        duration = audio.duration;
+                        updateDisplay();
+                    }
+                });
+                
+                audio.addEventListener('timeupdate', () => {
+                    if (hasAudio && isPlaying) {
+                        currentTime = audio.currentTime;
+                        updateDisplay();
+                    }
+                });
+                
+                audio.addEventListener('ended', () => {
+                    pause();
+                    currentTime = 0;
+                    if (audio) audio.currentTime = 0;
+                    updateDisplay();
+                });
+                
+                audio.addEventListener('error', (e) => {
+                    console.error('Audio error:', e);
+                    alert('Error loading audio file. Please try a different format.');
+                    hasAudio = false;
+                });
+                
+                audio.load();
+            }
+        });
+
+        function parseVTT(vttContent) {
+            subtitles = [];
+            vttStyles = '';
+            const lines = vttContent.split('\n');
+            let i = 0;
+            
+            // Parse STYLE block if it exists
+            while (i < lines.length) {
+                const line = lines[i].trim();
+                if (line === 'STYLE') {
+                    i++;
+                    let styleContent = '';
+                    while (i < lines.length && lines[i].trim() !== '') {
+                        styleContent += lines[i] + '\n';
+                        i++;
+                    }
+                    vttStyles = styleContent;
+                    applyVTTStyles(styleContent);
+                    break;
+                }
+                if (line.includes('-->')) break;
+                i++;
+            }
+            
+            // Reset to parse cues
+            i = 0;
+            while (i < lines.length && !lines[i].includes('-->')) {
+                i++;
+            }
+            
+            while (i < lines.length) {
+                if (lines[i].includes('-->')) {
+                    const timeLine = lines[i];
+                    const [start, end] = timeLine.split('-->').map(t => t.trim());
+                    
+                    i++;
+                    let text = '';
+                    while (i < lines.length && lines[i].trim() !== '') {
+                        text += lines[i] + '\n';
+                        i++;
+                    }
+                    
+                    subtitles.push({
+                        start: parseTime(start),
+                        end: parseTime(end),
+                        text: text.trim(),
+                        startStr: start,
+                        endStr: end
+                    });
+                }
+                i++;
+            }
+            
+            if (subtitles.length > 0) {
+                duration = Math.max(...subtitles.map(s => s.end), duration);
+            }
+            
+            renderSubtitles();
+            updateDisplay();
+        }
+
+        function applyVTTStyles(styleContent) {
+            // Remove existing style element if any
+            if (styleElement) {
+                styleElement.remove();
+            }
+            
+            // Convert VTT ::cue() syntax to regular CSS
+            let cssContent = styleContent
+                .replace(/::cue\(\.([^)]+)\)/g, '.subtitle-text .$1, .current-subtitle .$1')
+                .replace(/::cue/g, '.subtitle-text, .current-subtitle');
+            
+            // Create and append new style element
+            styleElement = document.createElement('style');
+            styleElement.textContent = cssContent;
+            document.head.appendChild(styleElement);
+        }
+
+        function parseSubtitleText(text) {
+            // Parse VTT tags like <c.classname>text</c>
+            // Support both self-closing and standard closing tags
+            return text
+                .replace(/<c\.([^>]+)>([^<]*)<\/c>/gi, '<span class="$1">$2</span>')
+                .replace(/<c\.([^>\/]+)\/>/gi, '<span class="$1"></span>')
+                .replace(/<c>([^<]*)<\/c>/gi, '<span>$1</span>')
+                .replace(/<b>([^<]*)<\/b>/gi, '<strong>$1</strong>')
+                .replace(/<i>([^<]*)<\/i>/gi, '<em>$1</em>')
+                .replace(/<u>([^<]*)<\/u>/gi, '<u>$1</u>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function parseTime(timeStr) {
+            const parts = timeStr.split(':');
+            const secondsPart = parts[parts.length - 1].replace(',', '.');
+            const seconds = parseFloat(secondsPart);
+            const minutes = parseInt(parts[parts.length - 2]) || 0;
+            const hours = parseInt(parts[parts.length - 3]) || 0;
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h > 0) {
+                return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function renderSubtitles() {
+            subtitleList.innerHTML = '';
+            subtitles.forEach((subtitle, index) => {
+                const div = document.createElement('div');
+                div.className = 'subtitle-item';
+                
+                // Check if subtitle contains low_confidence tags
+                if (subtitle.text.includes('low_confidence') || subtitle.text.includes('<c.low_confidence')) {
+                    div.classList.add('has-low-confidence');
+                }
+                
+                div.dataset.index = index;
+                div.innerHTML = `
+                    <div class="subtitle-time">${formatTime(subtitle.start)} → ${formatTime(subtitle.end)}</div>
+                    <div class="subtitle-text">${parseSubtitleText(subtitle.text)}</div>
+                `;
+                div.addEventListener('click', (e) => {
+                    if (e.target.closest('.edit-buttons')) return;
+                    
+                    // If not editing, seek to this timestamp
+                    if (editingIndex === null) {
+                        currentTime = subtitle.start;
+                        if (hasAudio && audio) {
+                            audio.currentTime = currentTime;
+                        }
+                        updateDisplay();
+                    }
+                });
+                div.addEventListener('dblclick', (e) => {
+                    if (e.target.closest('.edit-buttons')) return;
+                    if (editingIndex !== null) return;
+                    startEditing(index);
+                });
+                subtitleList.appendChild(div);
+            });
+        }
+
+        function startEditing(index) {
+            if (editingIndex !== null) return;
+            
+            editingIndex = index;
+            const items = subtitleList.querySelectorAll('.subtitle-item');
+            const item = items[index];
+            const subtitle = subtitles[index];
+            
+            item.classList.add('editing');
+            
+            // Convert tags to styled HTML for editing
+            const editableHTML = subtitle.text
+                .replace(/<c\.low_confidence>([^<]*)<\/c>/gi, '<span class="low_confidence">$1</span>')
+                .replace(/<c\.([^>]+)>([^<]*)<\/c>/gi, '<span class="$1">$2</span>')
+                .replace(/<b>([^<]*)<\/b>/gi, '<strong>$1</strong>')
+                .replace(/<i>([^<]*)<\/i>/gi, '<em>$1</em>')
+                .replace(/<u>([^<]*)<\/u>/gi, '<u>$1</u>');
+            
+            item.innerHTML = `
+                <div class="subtitle-time">${formatTime(subtitle.start)} → ${formatTime(subtitle.end)}</div>
+                <div class="subtitle-text">
+                    <div class="edit-view" id="editView" contenteditable="true">${editableHTML}</div>
+                    <div class="edit-buttons">
+                        <button onclick="saveEdit()">Save</button>
+                        <button onclick="cancelEdit()">Cancel</button>
+                    </div>
+                </div>
+            `;
+            
+            const editView = document.getElementById('editView');
+            editView.focus();
+            
+            // Place cursor at the end
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(editView);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
+        window.saveEdit = function() {
+            if (editingIndex === null) return;
+            
+            const editView = document.getElementById('editView');
+            
+            // Convert HTML back to VTT tags
+            let htmlContent = editView.innerHTML;
+            
+            // Convert styled spans back to VTT tags
+            htmlContent = htmlContent
+                .replace(/<span class="low_confidence">([^<]*)<\/span>/gi, '<c.low_confidence>$1</c>')
+                .replace(/<span class="([^"]+)">([^<]*)<\/span>/gi, '<c.$1>$2</c>')
+                .replace(/<strong>([^<]*)<\/strong>/gi, '<b>$1</b>')
+                .replace(/<em>([^<]*)<\/em>/gi, '<i>$1</i>')
+                .replace(/<u>([^<]*)<\/u>/gi, '<u>$1</u>')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<div>/gi, '\n')
+                .replace(/<\/div>/gi, '')
+                .trim();
+            
+            // Get plain text and preserve formatting
+            const textContent = editView.innerText || editView.textContent;
+            
+            // If there were low_confidence spans, reconstruct with tags
+            if (editView.querySelector('.low_confidence')) {
+                subtitles[editingIndex].text = htmlContent;
+            } else {
+                subtitles[editingIndex].text = textContent;
+            }
+            
+            editingIndex = null;
+            renderSubtitles();
+        };
+
+        window.cancelEdit = function() {
+            editingIndex = null;
+            renderSubtitles();
+        };
+
+        function updateDisplay() {
+            const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+            progressFill.style.width = progress + '%';
+            
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+            
+            let activeSubtitle = null;
+            const items = subtitleList.querySelectorAll('.subtitle-item');
+            
+            items.forEach((item, index) => {
+                const subtitle = subtitles[index];
+                if (currentTime >= subtitle.start && currentTime <= subtitle.end) {
+                    if (editingIndex !== index) {
+                        item.classList.add('active');
+                    }
+                    activeSubtitle = subtitle;
+                    if (editingIndex !== index) {
+                        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } else {
+                    if (editingIndex !== index) {
+                        item.classList.remove('active');
+                    }
+                }
+            });
+            
+            if (activeSubtitle) {
+                currentSubtitle.innerHTML = parseSubtitleText(activeSubtitle.text);
+            } else {
+                currentSubtitle.textContent = '';
+            }
+            
+            if (currentTime >= duration && isPlaying) {
+                pause();
+                currentTime = 0;
+                if (audio) audio.currentTime = 0;
+            }
+        }
+
+        function animate(timestamp) {
+            if (!isPlaying || hasAudio) return;
+            
+            if (lastTimestamp !== null) {
+                const delta = (timestamp - lastTimestamp) / 1000;
+                currentTime += delta;
+                updateDisplay();
+            }
+            
+            lastTimestamp = timestamp;
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        function play() {
+            if (editingIndex !== null) return;
+            
+            isPlaying = true;
+            playPauseBtn.textContent = 'Pause';
+            
+            if (hasAudio && audio) {
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.error('Audio play error:', error);
+                        isPlaying = false;
+                        playPauseBtn.textContent = 'Play';
+                    });
+                }
+            } else {
+                lastTimestamp = null;
+                animationFrame = requestAnimationFrame(animate);
+            }
+        }
+
+        function pause() {
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+            
+            if (hasAudio && audio) {
+                audio.pause();
+            } else {
+                lastTimestamp = null;
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                }
+            }
+        }
+
+        playPauseBtn.addEventListener('click', () => {
+            if (isPlaying) {
+                pause();
+            } else {
+                play();
+            }
+        });
+
+        progressBar.addEventListener('click', (e) => {
+            const rect = progressBar.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = x / rect.width;
+            currentTime = percent * duration;
+            
+            if (hasAudio && audio) {
+                audio.currentTime = currentTime;
+            }
+            
+            updateDisplay();
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const vttContent = generateVTT();
+            const blob = new Blob([vttContent], { type: 'text/vtt' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = vttFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        function generateVTT() {
+            let vtt = 'WEBVTT\n\n';
+            
+            // Add STYLE block if it exists
+            if (vttStyles) {
+                vtt += 'STYLE\n';
+                vtt += vttStyles;
+                vtt += '\n';
+            }
+            
+            subtitles.forEach((subtitle, index) => {
+                vtt += `${index + 1}\n`;
+                vtt += `${subtitle.startStr} --> ${subtitle.endStr}\n`;
+                vtt += `${subtitle.text}\n\n`;
+            });
+            return vtt;
+        }
+    </script>
+</body>
+</html>
